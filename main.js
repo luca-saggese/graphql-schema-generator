@@ -9,6 +9,7 @@ const args = process.argv.slice(2);
 const inputFileArgIndex = args.findIndex(arg => arg === '-i');
 const outputFileArgIndex = args.findIndex(arg => arg === '-o');
 
+// Check if input file is provided
 if (inputFileArgIndex === -1 || !args[inputFileArgIndex + 1]) {
     console.error('Error: Please provide an input file using -i flag.');
     process.exit(1);
@@ -19,6 +20,7 @@ const outputFilePath = outputFileArgIndex !== -1 && args[outputFileArgIndex + 1]
 
 const mutationArgs = {};
 
+// Read the input TypeScript file
 fs.readFile(inputFilePath, 'utf8', (err, data) => {
     if (err) {
         console.error('Error reading file:', err);
@@ -49,13 +51,15 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
             TSTypeAliasDeclaration(path) {
 
                 const { id, typeAnnotation } = path.node;
+                // Check if the type alias is a Mutation argument type
                 if (id.name.startsWith('Mutation') && id.name.endsWith('Args')) {
                     mutationArgs[id.name] = generateArgumentsDefinition(typeAnnotation);
                 }
+                // Handle Scalars definition
                 if (id.name === 'Scalars') {
                     typeDefs += generateScalarsDefinition(typeAnnotation);
                 } else if (id && typeAnnotation) {
-
+                    // Generate TypeScript type definition
                     const typeDefinition = generateTypeScriptDefinition(typeAnnotation);
                     if (typeDefinition) {
                         typeDefs += `type ${id.name} ${typeDefinition}\n`;
@@ -63,6 +67,7 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
                 }
             },
 
+            // Extract TypeScript enum declarations
             TSEnumDeclaration(path) {
                 const { id, members } = path.node;
                 if (id && members) {
@@ -86,6 +91,7 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
             definitions.push(queryDef);
         }
 
+        // Handle Mutation type arguments and convert to input types
         const mutation = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value === 'Mutation');
         if (mutation) {
             mutation.fields.forEach(field => {
@@ -103,17 +109,25 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
             });
         }
 
+        // Handle Query type arguments
         const query = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value === 'Query');
         if (query) {
             query.fields.forEach(field => {
-                const mutationArg = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value.toLowerCase() === `Query${field.name.value}Args`.toLowerCase());
-                if (mutationArg) {
-                    field.arguments = mutationArg.fields;
+                const queryArgs = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value.toLowerCase() === `Query${field.name.value}Args`.toLowerCase());
+                if (queryArgs) {
+                    field.arguments = queryArgs.fields;
                     // Change argument type to input
+                    queryArgs.fields.forEach(arg => {
+                        const t = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value === arg.type.type.name.value);
+                        if (t) {
+                            t.kind = 'InputObjectTypeDefinition';
+                        }
+                    });
                 }
             });
         }
 
+        // Filter out unused argument definitions
         const updatedAST = {
             ...parsedAST,
             definitions: definitions.filter(d => !/Mutation.*Arg/.test(d.name.value)).filter(d => !/Query.*Arg/.test(d.name.value)),
@@ -140,10 +154,10 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
     }
 });
 
+// Generate scalar type definitions
 function generateScalarsDefinition(typeAnnotation) {
     switch (typeAnnotation.type) {
         case 'TSTypeLiteral':
-
             if (typeAnnotation.members.length > 0) {
                 return `scalar ${typeAnnotation.members.map(member => member.key.name).join('\n scalar ')}\n`;
             }
@@ -153,10 +167,10 @@ function generateScalarsDefinition(typeAnnotation) {
     }
 }
 
+// Generate arguments definition for mutations and queries
 function generateArgumentsDefinition(typeAnnotation) {
     switch (typeAnnotation.type) {
         case 'TSTypeLiteral':
-
             if (typeAnnotation.members.length > 0) {
                 return `(${typeAnnotation.members.map(member => generateMember(member)).join(', ')})`;
             }
@@ -171,10 +185,10 @@ function generateArgumentsDefinition(typeAnnotation) {
     }
 }
 
+// Generate TypeScript type definition
 function generateTypeScriptDefinition(typeAnnotation) {
     switch (typeAnnotation.type) {
         case 'TSTypeLiteral':
-
             if (typeAnnotation.members.length > 0) {
                 return `{
 ${typeAnnotation.members.map(member => generateMember(member)).join('\n')}
@@ -193,6 +207,7 @@ ${ann.members.map(member => generateMember(member)).join('\n')}
     }
 }
 
+// Generate individual member of a type
 function generateMember(member) {
     if (member.type === 'TSPropertySignature' && member.key && member.typeAnnotation) {
         const key = member.key.name;
@@ -203,6 +218,7 @@ function generateMember(member) {
     return '';
 }
 
+// Generate the GraphQL type based on TypeScript type annotation
 function generateType(typeAnnotation) {
     switch (typeAnnotation.type) {
         case 'TSStringKeyword':
