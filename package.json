@@ -1,0 +1,17 @@
+{
+  "name": "graphql-schema-generator",
+  "version": "1.0.0",
+  "description": "A script to generate a GraphQL schema from TypeScript type definitions.",
+  "main": "main.js",
+  "scripts": {
+    "start": "node apollo_server_setup.js",
+    "generate:schema": "node apollo_server_setup.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@babel/parser": "^7.15.0",
+    "@babel/traverse": "^7.15.0",
+    "graphql": "^15.5.0"
+  }
+}
