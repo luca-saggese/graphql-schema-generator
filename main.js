@@ -137,11 +137,7 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
             definitions: definitions.filter(def => !def.name.value.match(/Mutation.*Args/) && !def.name.value.match(/Query.*Args/)),
         };
 
-        // Filter out unused argument definitions
-        const updatedAST = {
-            ...parsedAST,
-            definitions: definitions.filter(def => !def.name.value.match(/Mutation.*Args/) && !def.name.value.match(/Query.*Args/)),
-        };
+
 
         // Generate the updated GraphQL schema string from the AST
         const schemaString = print(updatedAST);
