@@ -92,33 +92,16 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
         }
 
         // Handle Mutation type arguments and convert to input types
-        const mutation = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value === 'Mutation');
-        if (mutation) {
-            mutation.fields.forEach(field => {
-                const mutationArg = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value.toLowerCase() === `Mutation${field.name.value}Args`.toLowerCase());
-                if (mutationArg) {
-                    field.arguments = mutationArg.fields;
-                    // Change argument type to input
-                    mutationArg.fields.forEach(arg => {
-                        const t = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value === arg.type.type.name.value);
-                        if (t) {
-                            t.kind = 'InputObjectTypeDefinition';
-                        }
-                    });
-                }
-            });
-        }
-
-        // Handle Query type arguments
-        const query = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value === 'Query');
+        let query = definitions.find(def => def.kind === 'ObjectTypeDefinition' && (def.name.value === 'Query' || def.name.value === 'Mutation'));
         if (query) {
             query.fields.forEach(field => {
-                const queryArgs = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value.toLowerCase() === `Query${field.name.value}Args`.toLowerCase());
+                const queryArgs = definitions.find(def => def.kind === 'ObjectTypeDefinition' && (def.name.value.toLowerCase() === `Mutation${field.name.value}Args`.toLowerCase() || def.name.value.toLowerCase() === `Query${field.name.value}Args`.toLowerCase()));
                 if (queryArgs) {
                     field.arguments = queryArgs.fields;
                     // Change argument type to input
+
                     queryArgs.fields.forEach(arg => {
-                        const t = definitions.find(def => def.kind === 'ObjectTypeDefinition' && def.name.value === arg.type.type.name.value);
+                        const t = definitions.find(def => def.kind === 'ObjectTypeDefinition' && arg.type.type && arg.type.type.name && def.name.value === arg.type.type.name.value);
                         if (t) {
                             t.kind = 'InputObjectTypeDefinition';
                         }
@@ -130,7 +113,7 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
         // Filter out unused argument definitions
         const updatedAST = {
             ...parsedAST,
-            definitions: definitions.filter(d => !/Mutation.*Arg/.test(d.name.value)).filter(d => !/Query.*Arg/.test(d.name.value)),
+            definitions: definitions.filter(def => !def.name.value.match(/Mutation.*Args/) && !def.name.value.match(/Query.*Args/)),
         };
 
         // Generate the updated GraphQL schema string from the AST
