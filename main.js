@@ -91,11 +91,11 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
             definitions.push(queryDef);
         }
 
-        // Handle Mutation type arguments and convert to input types
-        let query = definitions.find(def => def.kind === 'ObjectTypeDefinition' && (def.name.value === 'Query' || def.name.value === 'Mutation'));
+        // Rebuild Query parameters and change type to input
+        let query = definitions.find(def => def.kind === 'ObjectTypeDefinition' && (def.name.value === 'Query' ))//|| def.name.value === 'Mutation')
         if (query) {
             query.fields.forEach(field => {
-                const queryArgs = definitions.find(def => def.kind === 'ObjectTypeDefinition' && (def.name.value.toLowerCase() === `Mutation${field.name.value}Args`.toLowerCase() || def.name.value.toLowerCase() === `Query${field.name.value}Args`.toLowerCase()));
+                const queryArgs = definitions.find(def => def.kind === 'ObjectTypeDefinition' && ( def.name.value.toLowerCase() === `Query${field.name.value}Args`.toLowerCase()));
                 if (queryArgs) {
                     field.arguments = queryArgs.fields;
                     // Change argument type to input
@@ -109,6 +109,33 @@ fs.readFile(inputFilePath, 'utf8', (err, data) => {
                 }
             });
         }
+
+        // Rebuild Mutation parameters and change type to input
+        query = definitions.find(def => def.kind === 'ObjectTypeDefinition' && (def.name.value === 'Mutation' ))//|| def.name.value === 'Mutation')
+        if (query) {
+            query.fields.forEach(field => {
+                const queryArgs = definitions.find(def => def.kind === 'ObjectTypeDefinition' && ( def.name.value.toLowerCase() === `Mutation${field.name.value}Args`.toLowerCase()));
+                if (queryArgs) {
+                    field.arguments = queryArgs.fields;
+                    // Change argument type to input
+
+                    queryArgs.fields.forEach(arg => {
+                        const t = definitions.find(def => def.kind === 'ObjectTypeDefinition' && arg.type.type && arg.type.type.name && def.name.value === arg.type.type.name.value);
+                        if (t) {
+                            t.kind = 'InputObjectTypeDefinition';
+                        }
+                    });
+                }
+            });
+        }
+
+
+
+        const updatedAST = {
+            ...parsedAST,
+            // remove unecessary Args types
+            definitions: definitions.filter(def => !def.name.value.match(/Mutation.*Args/) && !def.name.value.match(/Query.*Args/)),
+        };
 
         // Filter out unused argument definitions
         const updatedAST = {
